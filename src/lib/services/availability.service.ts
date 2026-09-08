@@ -9,6 +9,7 @@
  */
 
 import prisma from "@/lib/prisma";
+import { DayOfWeek } from "@prisma/client";
 import { WORKING_HOURS, RESOURCE_STATUS, type ResourceStatus } from "@/lib/constants";
 import {
   timeToMinutes,
@@ -31,68 +32,58 @@ const WORK_START = timeToMinutes(WORKING_HOURS.start);
 const WORK_END = timeToMinutes(WORKING_HOURS.end);
 
 // ==========================================
-// Core: Get Resource Day Status
+// Core: Pure Calculation & Day Status
 // ==========================================
 
+export interface ResourceDataForAvailability {
+  id: string;
+  code: string;
+  name: string;
+  type: string;
+  block: string;
+  floor: number;
+  capacity: number;
+  hasProjector?: boolean;
+  hasSmartBoard?: boolean;
+  computerCount?: number;
+  department?: { code: string } | null;
+}
+
+export interface ScheduleDataForAvailability {
+  startTime: string;
+  endTime: string;
+  department?: { code: string } | null;
+  program?: { name: string } | null;
+  year?: number | null;
+  section?: string | null;
+  subject?: { name: string } | null;
+  faculty?: { name: string } | null;
+}
+
+export interface BookingDataForAvailability {
+  startTime: string;
+  endTime: string;
+  title: string;
+  department?: { code: string } | null;
+}
+
+export interface MaintenanceDataForAvailability {
+  reason: string;
+}
+
 /**
- * Calculate the full daily status for a single resource on a given day.
- * This is the fundamental building block of all availability queries.
+ * Pure calculation function: compute daily status for a single resource
+ * given its pre-fetched data, schedules, bookings, and maintenance blocks.
+ * Zero database queries are made inside this function.
  */
-export async function getResourceDayStatus(
-  resourceId: string,
+export function computeResourceDayStatusFromData(
+  resource: ResourceDataForAvailability,
+  schedules: ScheduleDataForAvailability[],
+  bookings: BookingDataForAvailability[],
+  maintenanceBlocks: MaintenanceDataForAvailability[],
   dayOfWeek: string,
   date?: string
-): Promise<ResourceDayStatus | null> {
-  const resource = await prisma.resource.findUnique({
-    where: { id: resourceId, isActive: true },
-    include: { department: true },
-  });
-
-  if (!resource) return null;
-
-  // Fetch schedule entries for this resource on this day
-  const schedules = await prisma.schedule.findMany({
-    where: {
-      resourceId,
-      dayOfWeek: dayOfWeek as never,
-      isActive: true,
-    },
-    include: {
-      department: true,
-      program: true,
-      subject: true,
-      faculty: true,
-    },
-    orderBy: { startTime: "asc" },
-  });
-
-  // Fetch bookings for this resource on the specific date
-  let bookings: Awaited<ReturnType<typeof prisma.booking.findMany>> = [];
-  if (date) {
-    bookings = await prisma.booking.findMany({
-      where: {
-        resourceId,
-        date: new Date(date),
-        status: "RESERVED",
-      },
-      include: { department: true },
-      orderBy: { startTime: "asc" },
-    });
-  }
-
-  // Fetch maintenance blocks for this date
-  let maintenanceBlocks: Awaited<ReturnType<typeof prisma.maintenanceBlock.findMany>> = [];
-  if (date) {
-    const dateObj = new Date(date);
-    maintenanceBlocks = await prisma.maintenanceBlock.findMany({
-      where: {
-        resourceId,
-        startDate: { lte: dateObj },
-        endDate: { gte: dateObj },
-      },
-    });
-  }
-
+): ResourceDayStatus {
   // Build occupied intervals from all sources
   const occupied: OccupiedInterval[] = [];
 
@@ -101,14 +92,15 @@ export async function getResourceDayStatus(
       start: s.startTime,
       end: s.endTime,
       type: "schedule",
-      label: [
-        s.department?.code,
-        s.program?.name,
-        s.year ? `Year ${s.year}` : null,
-        s.section ? `Sec ${s.section}` : null,
-      ]
-        .filter(Boolean)
-        .join(" ") || "Scheduled",
+      label:
+        [
+          s.department?.code,
+          s.program?.name,
+          s.year ? `Year ${s.year}` : null,
+          s.section ? `Sec ${s.section}` : null,
+        ]
+          .filter(Boolean)
+          .join(" ") || "Scheduled",
       departmentCode: s.department?.code ?? undefined,
       programName: s.program?.name ?? undefined,
       year: s.year ?? undefined,
@@ -118,7 +110,7 @@ export async function getResourceDayStatus(
     });
   }
 
-  for (const b of bookings as any[]) {
+  for (const b of bookings) {
     occupied.push({
       start: b.startTime,
       end: b.endTime,
@@ -236,6 +228,95 @@ export async function getResourceDayStatus(
 }
 
 /**
+ * Calculate the full daily status for a single resource on a given day.
+ * Backward compatible for single-resource queries (e.g. booking conflict checks).
+ */
+export async function getResourceDayStatus(
+  resourceId: string,
+  dayOfWeek: string,
+  date?: string
+): Promise<ResourceDayStatus | null> {
+  const resource = await prisma.resource.findUnique({
+    where: { id: resourceId, isActive: true },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      type: true,
+      block: true,
+      floor: true,
+      capacity: true,
+      hasProjector: true,
+      hasSmartBoard: true,
+      computerCount: true,
+      department: { select: { code: true } },
+    },
+  });
+
+  if (!resource) return null;
+
+  const dateObj = date ? new Date(date) : null;
+
+  const [schedules, bookings, maintenanceBlocks] = await Promise.all([
+    prisma.schedule.findMany({
+      where: {
+        resourceId,
+        dayOfWeek: dayOfWeek as DayOfWeek,
+        isActive: true,
+      },
+      select: {
+        startTime: true,
+        endTime: true,
+        department: { select: { code: true } },
+        program: { select: { name: true } },
+        year: true,
+        section: true,
+        subject: { select: { name: true } },
+        faculty: { select: { name: true } },
+      },
+      orderBy: { startTime: "asc" },
+    }),
+    dateObj
+      ? prisma.booking.findMany({
+          where: {
+            resourceId,
+            date: dateObj,
+            status: "RESERVED",
+          },
+          select: {
+            startTime: true,
+            endTime: true,
+            title: true,
+            department: { select: { code: true } },
+          },
+          orderBy: { startTime: "asc" },
+        })
+      : Promise.resolve([]),
+    dateObj
+      ? prisma.maintenanceBlock.findMany({
+          where: {
+            resourceId,
+            startDate: { lte: dateObj },
+            endDate: { gte: dateObj },
+          },
+          select: {
+            reason: true,
+          },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  return computeResourceDayStatusFromData(
+    resource,
+    schedules,
+    bookings,
+    maintenanceBlocks,
+    dayOfWeek,
+    date
+  );
+}
+
+/**
  * Calculate free intervals within working hours given merged occupied intervals.
  */
 function calculateFreeIntervals(
@@ -330,14 +411,130 @@ export async function getAllResourcesDayStatus(
 
   const resources = await prisma.resource.findMany({
     where: whereClause,
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      type: true,
+      block: true,
+      floor: true,
+      capacity: true,
+      hasProjector: true,
+      hasSmartBoard: true,
+      computerCount: true,
+      department: { select: { code: true } },
+    },
     orderBy: [{ block: "asc" }, { floor: "asc" }, { code: "asc" }],
   });
 
-  // Get status for each resource
+  if (resources.length === 0) return [];
+
+  const resourceIds = resources.map((r) => r.id);
+  const dateObj = date ? new Date(date) : null;
+
+  // Batch load schedules, bookings, and maintenance blocks in parallel
+  const [schedules, bookings, maintenanceBlocks] = await Promise.all([
+    prisma.schedule.findMany({
+      where: {
+        resourceId: { in: resourceIds },
+        dayOfWeek: dayOfWeek as DayOfWeek,
+        isActive: true,
+      },
+      select: {
+        resourceId: true,
+        startTime: true,
+        endTime: true,
+        department: { select: { code: true } },
+        program: { select: { name: true } },
+        year: true,
+        section: true,
+        subject: { select: { name: true } },
+        faculty: { select: { name: true } },
+      },
+      orderBy: { startTime: "asc" },
+    }),
+    dateObj
+      ? prisma.booking.findMany({
+          where: {
+            resourceId: { in: resourceIds },
+            date: dateObj,
+            status: "RESERVED",
+          },
+          select: {
+            resourceId: true,
+            startTime: true,
+            endTime: true,
+            title: true,
+            department: { select: { code: true } },
+          },
+          orderBy: { startTime: "asc" },
+        })
+      : [],
+    dateObj
+      ? prisma.maintenanceBlock.findMany({
+          where: {
+            resourceId: { in: resourceIds },
+            startDate: { lte: dateObj },
+            endDate: { gte: dateObj },
+          },
+          select: {
+            resourceId: true,
+            reason: true,
+          },
+        })
+      : [],
+  ]);
+
+  type ScheduleItem = (typeof schedules)[number];
+  type BookingItem = (typeof bookings)[number];
+  type MaintenanceItem = (typeof maintenanceBlocks)[number];
+
+  // Group by resourceId
+  const schedulesByResource = new Map<string, ScheduleItem[]>();
+  for (const s of schedules) {
+    let list = schedulesByResource.get(s.resourceId);
+    if (!list) {
+      list = [];
+      schedulesByResource.set(s.resourceId, list);
+    }
+    list.push(s);
+  }
+
+  const bookingsByResource = new Map<string, BookingItem[]>();
+  for (const b of bookings) {
+    let list = bookingsByResource.get(b.resourceId);
+    if (!list) {
+      list = [];
+      bookingsByResource.set(b.resourceId, list);
+    }
+    list.push(b);
+  }
+
+  const maintenanceByResource = new Map<string, MaintenanceItem[]>();
+  for (const m of maintenanceBlocks) {
+    let list = maintenanceByResource.get(m.resourceId);
+    if (!list) {
+      list = [];
+      maintenanceByResource.set(m.resourceId, list);
+    }
+    list.push(m);
+  }
+
+  // Get status for each resource in-memory
   const results: ResourceDayStatus[] = [];
   for (const resource of resources) {
-    const status = await getResourceDayStatus(resource.id, dayOfWeek, date);
-    if (!status) continue;
+    const resSchedules = schedulesByResource.get(resource.id) ?? [];
+    const resBookings = bookingsByResource.get(resource.id) ?? [];
+    const resMaintenance = maintenanceByResource.get(resource.id) ?? [];
+
+    const status = computeResourceDayStatusFromData(
+      resource,
+      resSchedules,
+      resBookings,
+      resMaintenance,
+      dayOfWeek,
+      date
+    );
 
     // Apply status filter
     if (filters.status && status.status !== filters.status) continue;
@@ -447,29 +644,91 @@ export async function getWeeklyUtilization(
 
   const resources = await prisma.resource.findMany({
     where: whereClause,
-    include: { department: true },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      type: true,
+      block: true,
+      floor: true,
+      capacity: true,
+      hasProjector: true,
+      hasSmartBoard: true,
+      computerCount: true,
+      department: { select: { code: true } },
+    },
     orderBy: [{ block: "asc" }, { floor: "asc" }, { code: "asc" }],
   });
 
-  const weekdays = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"];
+  if (resources.length === 0) return [];
+
+  const weekdays: DayOfWeek[] = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"];
+  const resourceIds = resources.map((r) => r.id);
+
+  // Fetch all schedules for all 5 weekdays in ONE query
+  const schedules = await prisma.schedule.findMany({
+    where: {
+      resourceId: { in: resourceIds },
+      dayOfWeek: { in: weekdays },
+      isActive: true,
+    },
+    select: {
+      resourceId: true,
+      dayOfWeek: true,
+      startTime: true,
+      endTime: true,
+      department: { select: { code: true } },
+      program: { select: { name: true } },
+      year: true,
+      section: true,
+      subject: { select: { name: true } },
+      faculty: { select: { name: true } },
+    },
+    orderBy: { startTime: "asc" },
+  });
+
+  type WeeklyScheduleItem = (typeof schedules)[number];
+  // Group schedules by resourceId -> dayOfWeek
+  const schedulesMap = new Map<string, Map<string, WeeklyScheduleItem[]>>();
+  for (const s of schedules) {
+    let dayMap = schedulesMap.get(s.resourceId);
+    if (!dayMap) {
+      dayMap = new Map();
+      schedulesMap.set(s.resourceId, dayMap);
+    }
+    let list = dayMap.get(s.dayOfWeek);
+    if (!list) {
+      list = [];
+      dayMap.set(s.dayOfWeek, list);
+    }
+    list.push(s);
+  }
+
   const results: WeeklyUtilization[] = [];
 
   for (const resource of resources) {
+    const dayMap = schedulesMap.get(resource.id);
     const days: WeeklyUtilization["days"] = {};
     let totalUtilization = 0;
     let unusedDays = 0;
 
     for (const day of weekdays) {
-      const status = await getResourceDayStatus(resource.id, day);
-      if (status) {
-        days[day] = {
-          scheduledHours: status.scheduledHours,
-          utilizationPercent: status.utilizationPercent,
-          status: status.status,
-        };
-        totalUtilization += status.utilizationPercent;
-        if (status.status === RESOURCE_STATUS.FULLY_UNUSED) unusedDays++;
-      }
+      const resDaySchedules = dayMap?.get(day) ?? [];
+      const status = computeResourceDayStatusFromData(
+        resource,
+        resDaySchedules,
+        [],
+        [],
+        day
+      );
+
+      days[day] = {
+        scheduledHours: status.scheduledHours,
+        utilizationPercent: status.utilizationPercent,
+        status: status.status,
+      };
+      totalUtilization += status.utilizationPercent;
+      if (status.status === RESOURCE_STATUS.FULLY_UNUSED) unusedDays++;
     }
 
     results.push({
@@ -494,20 +753,12 @@ export async function getWeeklyUtilization(
 // ==========================================
 
 /**
- * Get dashboard summary for a given day.
+ * Pure calculation function: derive DashboardSummary from an already-fetched
+ * list of ResourceDayStatus objects without any database queries.
  */
-export async function getDashboardSummary(
-  date?: string
-): Promise<DashboardSummary> {
-  const dayOfWeek = date
-    ? getDayOfWeek(new Date(date))
-    : getDayOfWeek(new Date());
-
-  const allStatuses = await getAllResourcesDayStatus({
-    date,
-    dayOfWeek,
-  });
-
+export function deriveDashboardSummary(
+  allStatuses: ResourceDayStatus[]
+): DashboardSummary {
   const totalResources = allStatuses.length;
   const fullyUnused = allStatuses.filter(
     (s) => s.status === RESOURCE_STATUS.FULLY_UNUSED
@@ -595,6 +846,25 @@ export async function getDashboardSummary(
     byFloor,
     byDepartment,
   };
+}
+
+/**
+ * Get dashboard summary for a given day.
+ * Re-uses getAllResourcesDayStatus and deriveDashboardSummary.
+ */
+export async function getDashboardSummary(
+  date?: string
+): Promise<DashboardSummary> {
+  const dayOfWeek = date
+    ? getDayOfWeek(new Date(date))
+    : getDayOfWeek(new Date());
+
+  const allStatuses = await getAllResourcesDayStatus({
+    date,
+    dayOfWeek,
+  });
+
+  return deriveDashboardSummary(allStatuses);
 }
 
 // ==========================================

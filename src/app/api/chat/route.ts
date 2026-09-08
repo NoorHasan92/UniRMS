@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
     const formattedDate = today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-3.6-flash",
+      model: "gemini-3.5-flash-lite",
       systemInstruction: `You are the AI assistant for UniRMS (University Resource Management System). Today's date is ${formattedDate}. When users ask for today's schedule, tomorrow's schedule, or any dates, calculate the correct date relative to ${formattedDate}. When users ask about facilities like projectors, smart boards, or computers, use the getAllResourcesDayStatus tool and check the hasProjector, hasSmartBoard, and computerCount fields in the returned results to answer their query accurately.`,
       tools: [{ functionDeclarations: tools as any }]
     });
@@ -122,10 +122,10 @@ export async function POST(req: NextRequest) {
 
     const result = await chat.sendMessage(lastUserMessage);
     const response = result.response;
-    
+
     // Check if Gemini wants to call a function
     const functionCalls = response.functionCalls();
-    
+
     if (functionCalls && functionCalls.length > 0) {
       const call = functionCalls[0];
       let toolData = null;

@@ -148,6 +148,7 @@ model Resource {
   bookings         Booking[]
   maintenanceBlocks MaintenanceBlock[]
 
+  @@index([isActive, block, floor, code])
   @@map("resources")
 }
 
@@ -245,6 +246,7 @@ model MaintenanceBlock {
   resource Resource @relation(fields: [resourceId], references: [id])
 
   @@index([resourceId])
+  @@index([resourceId, startDate, endDate])
   @@map("maintenance_blocks")
 }
 

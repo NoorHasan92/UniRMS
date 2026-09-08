@@ -1,4 +1,4 @@
-import { getDashboardSummary, getAllResourcesDayStatus } from "@/lib/services/availability.service";
+import { getAllResourcesDayStatus, deriveDashboardSummary } from "@/lib/services/availability.service";
 import { getDayOfWeek, formatDateDisplay } from "@/lib/time-utils";
 import { BLOCK_LABELS, RESOURCE_STATUS, DAY_FULL_LABELS } from "@/lib/constants";
 import StatusBadge from "@/components/ui/status-badge";
@@ -20,8 +20,8 @@ export default async function DashboardPage() {
   const dayOfWeek = getDayOfWeek(today);
   const dateDisplay = formatDateDisplay(today);
 
-  const summary = await getDashboardSummary();
   const allStatuses = await getAllResourcesDayStatus({ dayOfWeek });
+  const summary = deriveDashboardSummary(allStatuses);
 
   // Sort: fully unused first, then by utilization
   const fullyUnused = allStatuses.filter((s) => s.status === RESOURCE_STATUS.FULLY_UNUSED);
