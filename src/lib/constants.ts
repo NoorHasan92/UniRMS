@@ -195,7 +195,7 @@ export const NAV_ITEMS: {
     icon: "Settings",
     adminOnly: true,
     children: [
-      { title: "Departments", href: "/admin/departments" },
+      { title: "Departments", href: "/departments" },
       { title: "Programs", href: "/admin/programs" },
       { title: "Faculty", href: "/admin/faculty" },
       { title: "Subjects", href: "/admin/subjects" },

@@ -4,9 +4,15 @@ import { requireAuth } from "@/lib/auth-utils";
 
 export const dynamic = "force-dynamic";
 
-export default async function AvailabilityPage() {
+export default async function AvailabilityPage(props: {
+  searchParams: Promise<{ tab?: string; statusFilter?: string }>;
+}) {
   await requireAuth();
+  const searchParams = await props.searchParams;
   const departments = await getDepartments();
+
+  const initialTab = searchParams?.tab === "status" ? "STATUS" : "CONTINUOUS";
+  const initialStatusFilter = searchParams?.statusFilter;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-fade-in">
@@ -19,7 +25,11 @@ export default async function AvailabilityPage() {
         </div>
       </div>
 
-      <AvailabilitySearch departments={departments} />
+      <AvailabilitySearch
+        departments={departments}
+        initialTab={initialTab}
+        initialStatusFilter={initialStatusFilter}
+      />
     </div>
   );
 }

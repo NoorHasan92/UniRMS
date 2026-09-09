@@ -1,7 +1,6 @@
 import { getAllResourcesDayStatus, deriveDashboardSummary } from "@/lib/services/availability.service";
 import { getDayOfWeek, formatDateDisplay } from "@/lib/time-utils";
 import { BLOCK_LABELS, RESOURCE_STATUS, DAY_FULL_LABELS } from "@/lib/constants";
-import StatusBadge from "@/components/ui/status-badge";
 import {
   Building2,
   CheckCircle2,
@@ -9,7 +8,6 @@ import {
   AlertTriangle,
   BarChart3,
   CalendarCheck,
-  MessageSquareText,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -39,13 +37,6 @@ export default async function DashboardPage() {
             {dateDisplay} • {DAY_FULL_LABELS[dayOfWeek] ?? dayOfWeek}
           </p>
         </div>
-        <Link
-          href="/ai"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-        >
-          <MessageSquareText className="h-4 w-4" />
-          Ask AI Assistant
-        </Link>
       </div>
 
       {/* KPI Cards */}
@@ -55,37 +46,42 @@ export default async function DashboardPage() {
           value={summary.totalResources}
           icon={<Building2 className="h-5 w-5" />}
           color="blue"
+          href="/resources"
         />
         <KPICard
           label="Fully Unused"
           value={summary.fullyUnused}
           icon={<CheckCircle2 className="h-5 w-5" />}
           color="emerald"
-          highlight={summary.fullyUnused > 0}
+          href="/availability?tab=status&statusFilter=FULLY_UNUSED"
         />
         <KPICard
           label="Partially Used"
           value={summary.partiallyUsed}
           icon={<Clock className="h-5 w-5" />}
           color="amber"
+          href="/availability?tab=status&statusFilter=PARTIALLY_USED"
         />
         <KPICard
           label="Fully Occupied"
           value={summary.fullyOccupied}
           icon={<AlertTriangle className="h-5 w-5" />}
           color="red"
+          href="/availability?tab=status&statusFilter=FULLY_OCCUPIED"
         />
         <KPICard
           label="Avg Utilization"
           value={`${summary.averageUtilization}%`}
           icon={<BarChart3 className="h-5 w-5" />}
           color="violet"
+          href="/analytics"
         />
         <KPICard
           label="Available"
           value={summary.availableForBooking}
           icon={<CalendarCheck className="h-5 w-5" />}
           color="cyan"
+          href="/availability?tab=status&statusFilter=AVAILABLE"
         />
       </div>
 
@@ -266,83 +262,6 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Today's Resource Overview Table */}
-      <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
-        <div className="px-6 py-4 border-b border-zinc-100 dark:border-zinc-800">
-          <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
-            Today&apos;s Resource Overview
-          </h2>
-          <p className="text-xs text-zinc-500 mt-0.5">All resources with current utilization status</p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                <th className="px-6 py-3">Resource</th>
-                <th className="px-6 py-3">Location</th>
-                <th className="px-6 py-3">Type</th>
-                <th className="px-6 py-3">Department</th>
-                <th className="px-6 py-3">Capacity</th>
-                <th className="px-6 py-3">Utilization</th>
-                <th className="px-6 py-3">Status</th>
-                <th className="px-6 py-3">Scheduled</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-              {allStatuses.map((r) => (
-                <tr
-                  key={r.resourceId}
-                  className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
-                >
-                  <td className="px-6 py-3">
-                    <Link
-                      href={`/resources/${r.resourceId}`}
-                      className="text-sm font-medium text-blue-600 hover:underline"
-                    >
-                      {r.resourceCode}
-                    </Link>
-                  </td>
-                  <td className="px-6 py-3 text-sm text-zinc-600 dark:text-zinc-400">
-                    {BLOCK_LABELS[r.block]} • Floor {r.floor}
-                  </td>
-                  <td className="px-6 py-3 text-sm text-zinc-600 dark:text-zinc-400">{r.resourceType}</td>
-                  <td className="px-6 py-3 text-sm text-zinc-600 dark:text-zinc-400">
-                    {r.departmentCode ?? "—"}
-                  </td>
-                  <td className="px-6 py-3 text-sm text-zinc-600 dark:text-zinc-400">{r.capacity}</td>
-                  <td className="px-6 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-16 bg-zinc-100 dark:bg-zinc-800 rounded-full h-1.5">
-                        <div
-                          className={`h-1.5 rounded-full ${
-                            r.utilizationPercent === 0
-                              ? "bg-emerald-500"
-                              : r.utilizationPercent < 40
-                              ? "bg-amber-500"
-                              : r.utilizationPercent < 80
-                              ? "bg-blue-500"
-                              : "bg-red-500"
-                          }`}
-                          style={{ width: `${Math.min(r.utilizationPercent, 100)}%` }}
-                        />
-                      </div>
-                      <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                        {r.utilizationPercent}%
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-3">
-                    <StatusBadge status={r.status} />
-                  </td>
-                  <td className="px-6 py-3 text-sm text-zinc-600 dark:text-zinc-400">
-                    {r.scheduledHours}h
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
     </div>
   );
 }
@@ -353,38 +272,68 @@ function KPICard({
   value,
   icon,
   color,
-  highlight,
+  href,
 }: {
   label: string;
   value: string | number;
   icon: React.ReactNode;
   color: string;
-  highlight?: boolean;
+  href: string;
 }) {
-  const colorClasses: Record<string, { bg: string; icon: string }> = {
-    blue: { bg: "bg-blue-50 dark:bg-blue-950/30", icon: "text-blue-600" },
-    emerald: { bg: "bg-emerald-50 dark:bg-emerald-950/30", icon: "text-emerald-600" },
-    amber: { bg: "bg-amber-50 dark:bg-amber-950/30", icon: "text-amber-600" },
-    red: { bg: "bg-red-50 dark:bg-red-950/30", icon: "text-red-600" },
-    violet: { bg: "bg-violet-50 dark:bg-violet-950/30", icon: "text-violet-600" },
-    cyan: { bg: "bg-cyan-50 dark:bg-cyan-950/30", icon: "text-cyan-600" },
+  const colorClasses: Record<string, { bg: string; icon: string; hoverBorder: string; hoverBg: string }> = {
+    blue: {
+      bg: "bg-blue-50 dark:bg-blue-950/30",
+      icon: "text-blue-600",
+      hoverBorder: "hover:border-blue-300 dark:hover:border-blue-700",
+      hoverBg: "hover:bg-blue-50/40 dark:hover:bg-blue-950/20",
+    },
+    emerald: {
+      bg: "bg-emerald-50 dark:bg-emerald-950/30",
+      icon: "text-emerald-600",
+      hoverBorder: "hover:border-emerald-300 dark:hover:border-emerald-700",
+      hoverBg: "hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20",
+    },
+    amber: {
+      bg: "bg-amber-50 dark:bg-amber-950/30",
+      icon: "text-amber-600",
+      hoverBorder: "hover:border-amber-300 dark:hover:border-amber-700",
+      hoverBg: "hover:bg-amber-50/40 dark:hover:bg-amber-950/20",
+    },
+    red: {
+      bg: "bg-red-50 dark:bg-red-950/30",
+      icon: "text-red-600",
+      hoverBorder: "hover:border-red-300 dark:hover:border-red-700",
+      hoverBg: "hover:bg-red-50/40 dark:hover:bg-red-950/20",
+    },
+    violet: {
+      bg: "bg-violet-50 dark:bg-violet-950/30",
+      icon: "text-violet-600",
+      hoverBorder: "hover:border-violet-300 dark:hover:border-violet-700",
+      hoverBg: "hover:bg-violet-50/40 dark:hover:bg-violet-950/20",
+    },
+    cyan: {
+      bg: "bg-cyan-50 dark:bg-cyan-950/30",
+      icon: "text-cyan-600",
+      hoverBorder: "hover:border-cyan-300 dark:hover:border-cyan-700",
+      hoverBg: "hover:bg-cyan-50/40 dark:hover:bg-cyan-950/20",
+    },
   };
 
   const c = colorClasses[color] ?? colorClasses.blue;
 
   return (
-    <div
-      className={`rounded-xl border p-4 transition-all ${
-        highlight
-          ? "border-emerald-300 dark:border-emerald-700 ring-1 ring-emerald-200 dark:ring-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20"
-          : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900"
-      }`}
+    <Link
+      href={href}
+      className={`group block rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 transition-all duration-200 cursor-pointer hover:scale-[1.03] hover:shadow-md ${c.hoverBorder} ${c.hoverBg}`}
     >
-      <div className={`inline-flex p-2 rounded-lg ${c.bg} ${c.icon} mb-3`}>
+      <div className={`inline-flex p-2.5 rounded-xl ${c.bg} ${c.icon} mb-3 transition-transform duration-200 group-hover:scale-110`}>
         {icon}
       </div>
-      <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{value}</div>
-      <div className="text-xs text-zinc-500 mt-1">{label}</div>
-    </div>
+      <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">{value}</div>
+      <div className="text-xs text-zinc-500 mt-1 flex items-center justify-between">
+        <span>{label}</span>
+        <span className="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-zinc-400 font-medium">View &rarr;</span>
+      </div>
+    </Link>
   );
 }

@@ -4,6 +4,7 @@ import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 
 import PageTransition from "@/components/layout/page-transition";
+import FloatingAIButton from "@/components/layout/floating-ai-button";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -29,6 +30,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
               {children}
             </PageTransition>
           </main>
+          <FloatingAIButton />
         </div>
       </div>
     </div>

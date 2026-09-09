@@ -19,6 +19,19 @@ export async function searchAvailability(data: AvailabilitySearchInput) {
       floor: data.floor,
     });
   } else {
+    if (data.status === "AVAILABLE") {
+      const all = await getAllResourcesDayStatus({
+        date: data.date,
+        dayOfWeek: data.dayOfWeek,
+        block: data.block,
+        floor: data.floor,
+        departmentId: data.departmentId,
+        resourceType: data.resourceType,
+        minCapacity: data.minCapacity,
+      });
+      return all.filter((r) => r.status !== "FULLY_OCCUPIED");
+    }
+
     return await getAllResourcesDayStatus({
       date: data.date,
       dayOfWeek: data.dayOfWeek,
@@ -26,7 +39,7 @@ export async function searchAvailability(data: AvailabilitySearchInput) {
       floor: data.floor,
       departmentId: data.departmentId,
       resourceType: data.resourceType,
-      status: data.status,
+      status: data.status as any,
       minCapacity: data.minCapacity,
     });
   }

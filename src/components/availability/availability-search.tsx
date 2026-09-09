@@ -1,62 +1,90 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { type Department } from "@prisma/client";
-import { Search, Clock, Users, Building, Filter, MapPin } from "lucide-react";
+import { Search, Clock, Users, Building, Filter, MapPin, X, CheckCircle2 } from "lucide-react";
 import Button from "@/components/ui/button";
 import Input from "@/components/ui/input";
 import Select from "@/components/ui/select";
 import StatusBadge from "@/components/ui/status-badge";
 import { searchAvailability } from "@/app/actions/search.actions";
-import { DAY_FULL_LABELS, BLOCK_LABELS } from "@/lib/constants";
+import { BLOCK_LABELS } from "@/lib/constants";
 import { formatTime12h, getDayOfWeek } from "@/lib/time-utils";
 
 interface AvailabilitySearchProps {
   departments: Department[];
+  initialTab?: "CONTINUOUS" | "STATUS";
+  initialStatusFilter?: string;
 }
 
-export default function AvailabilitySearch({ departments }: AvailabilitySearchProps) {
+export default function AvailabilitySearch({
+  departments,
+  initialTab = "CONTINUOUS",
+  initialStatusFilter = "",
+}: AvailabilitySearchProps) {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<any[] | null>(null);
 
   // Filters
-  const [searchMode, setSearchMode] = useState<"CONTINUOUS" | "STATUS">("CONTINUOUS");
+  const [searchMode, setSearchMode] = useState<"CONTINUOUS" | "STATUS">(initialTab);
   const [date, setDate] = useState<string>(new Date().toISOString().split("T")[0]);
   const [minDuration, setMinDuration] = useState<number>(60);
   const [minCapacity, setMinCapacity] = useState<number>(1);
+  const [statusFilter, setStatusFilter] = useState<string>(initialStatusFilter);
   const [resourceType, setResourceType] = useState<string>("");
   const [departmentId, setDepartmentId] = useState<string>("");
   const [block, setBlock] = useState<string>("");
   const [floor, setFloor] = useState<string>("");
 
+  const executeSearch = useCallback(
+    async (params?: { mode?: "CONTINUOUS" | "STATUS"; status?: string; searchDate?: string }) => {
+      const modeToUse = params?.mode ?? searchMode;
+      const statusToUse = params?.status !== undefined ? params.status : statusFilter;
+      const dateToUse = params?.searchDate ?? date;
+
+      setLoading(true);
+      try {
+        const dayOfWeek = getDayOfWeek(new Date(dateToUse));
+        const res = await searchAvailability({
+          date: dateToUse,
+          dayOfWeek: dayOfWeek as any,
+          minContinuousFreeMinutes: modeToUse === "CONTINUOUS" ? minDuration : undefined,
+          minCapacity: minCapacity > 1 ? minCapacity : undefined,
+          resourceType: (resourceType as any) || undefined,
+          departmentId: departmentId || undefined,
+          block: (block as any) || undefined,
+          floor: floor ? Number(floor) : undefined,
+          status: modeToUse === "STATUS" ? ((statusToUse as any) || undefined) : undefined,
+        });
+
+        setResults(res);
+      } catch (err) {
+        console.error(err);
+        alert("Failed to fetch availability");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [searchMode, statusFilter, date, minDuration, minCapacity, resourceType, departmentId, block, floor]
+  );
+
+  // Auto-search on mount if initialStatusFilter or initialTab is STATUS
+  useEffect(() => {
+    if (initialStatusFilter || initialTab === "STATUS") {
+      executeSearch({
+        mode: initialTab,
+        status: initialStatusFilter,
+      });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
-
-    try {
-      const dayOfWeek = getDayOfWeek(new Date(date));
-      const res = await searchAvailability({
-        date,
-        dayOfWeek: dayOfWeek as any,
-        minContinuousFreeMinutes: searchMode === "CONTINUOUS" ? minDuration : undefined,
-        minCapacity: minCapacity > 1 ? minCapacity : undefined,
-        resourceType: (resourceType as any) || undefined,
-        departmentId: departmentId || undefined,
-        block: (block as any) || undefined,
-        floor: floor ? Number(floor) : undefined,
-      });
-
-      setResults(res);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to fetch availability");
-    } finally {
-      setLoading(false);
-    }
+    await executeSearch();
   }
 
   // Options
-  const deptOptions = departments.map(d => ({ value: d.id, label: d.code }));
+  const deptOptions = departments.map((d) => ({ value: d.id, label: d.code }));
   const typeOptions = [
     { value: "CLASSROOM", label: "Classroom" },
     { value: "LAB", label: "Laboratory" },
@@ -68,29 +96,48 @@ export default function AvailabilitySearch({ departments }: AvailabilitySearchPr
     { value: "LEFT", label: "Left Block" },
     { value: "RIGHT", label: "Right Block" },
   ];
+  const statusOptions = [
+    { value: "", label: "All Statuses" },
+    { value: "AVAILABLE", label: "Available (Unused & Partial)" },
+    { value: "FULLY_UNUSED", label: "Fully Unused" },
+    { value: "PARTIALLY_USED", label: "Partially Used" },
+    { value: "FULLY_OCCUPIED", label: "Fully Occupied" },
+  ];
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
       {/* Filters Sidebar */}
-      <div className="lg:col-span-1 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-5 sticky top-20">
-        <div className="flex items-center gap-2 mb-4 text-zinc-900 dark:text-zinc-100 font-medium pb-4 border-b border-zinc-100 dark:border-zinc-800">
-          <Filter className="h-5 w-5" />
+      <div className="lg:col-span-1 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-5 sticky top-20">
+        <div className="flex items-center gap-2 mb-4 text-zinc-900 dark:text-zinc-100 font-semibold pb-4 border-b border-zinc-100 dark:border-zinc-800">
+          <Filter className="h-4 w-4 text-blue-600" />
           <h2>Search Criteria</h2>
         </div>
 
         <form onSubmit={handleSearch} className="space-y-4">
-          <div className="flex bg-zinc-100 dark:bg-zinc-800 rounded-lg p-1">
+          <div className="flex bg-zinc-100 dark:bg-zinc-800 rounded-xl p-1">
             <button
               type="button"
-              className={`flex-1 text-xs font-medium py-1.5 rounded-md transition-colors ${searchMode === "CONTINUOUS" ? "bg-white dark:bg-zinc-700 shadow text-blue-600 dark:text-blue-400" : "text-zinc-500"}`}
-              onClick={() => setSearchMode("CONTINUOUS")}
+              className={`flex-1 text-xs font-semibold py-2 rounded-lg transition-all duration-150 cursor-pointer ${
+                searchMode === "CONTINUOUS"
+                  ? "bg-white dark:bg-zinc-700 shadow-xs text-blue-600 dark:text-blue-400 font-bold"
+                  : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300"
+              }`}
+              onClick={() => {
+                setSearchMode("CONTINUOUS");
+              }}
             >
               Find Slots
             </button>
             <button
               type="button"
-              className={`flex-1 text-xs font-medium py-1.5 rounded-md transition-colors ${searchMode === "STATUS" ? "bg-white dark:bg-zinc-700 shadow text-blue-600 dark:text-blue-400" : "text-zinc-500"}`}
-              onClick={() => setSearchMode("STATUS")}
+              className={`flex-1 text-xs font-semibold py-2 rounded-lg transition-all duration-150 cursor-pointer ${
+                searchMode === "STATUS"
+                  ? "bg-white dark:bg-zinc-700 shadow-xs text-blue-600 dark:text-blue-400 font-bold"
+                  : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300"
+              }`}
+              onClick={() => {
+                setSearchMode("STATUS");
+              }}
             >
               Daily Status
             </button>
@@ -106,7 +153,7 @@ export default function AvailabilitySearch({ departments }: AvailabilitySearchPr
 
           {searchMode === "CONTINUOUS" && (
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 flex justify-between">
+              <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300 flex justify-between">
                 <span>Required Duration</span>
                 <span className="text-blue-600 font-semibold">{minDuration} mins</span>
               </label>
@@ -122,6 +169,16 @@ export default function AvailabilitySearch({ departments }: AvailabilitySearchPr
             </div>
           )}
 
+          {searchMode === "STATUS" && (
+            <Select
+              label="Status Filter"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              options={statusOptions}
+              placeholder="All Statuses"
+            />
+          )}
+
           <Input
             label="Minimum Capacity"
             type="number"
@@ -131,8 +188,8 @@ export default function AvailabilitySearch({ departments }: AvailabilitySearchPr
           />
 
           <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 space-y-4">
-            <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Location & Type</p>
-            
+            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Location & Type</p>
+
             <Select
               label="Resource Type"
               value={resourceType}
@@ -140,7 +197,7 @@ export default function AvailabilitySearch({ departments }: AvailabilitySearchPr
               options={typeOptions}
               placeholder="Any Type"
             />
-            
+
             <Select
               label="Department"
               value={departmentId}
@@ -148,7 +205,7 @@ export default function AvailabilitySearch({ departments }: AvailabilitySearchPr
               options={deptOptions}
               placeholder="Any Department"
             />
-            
+
             <div className="grid grid-cols-2 gap-2">
               <Select
                 label="Block"
@@ -169,7 +226,7 @@ export default function AvailabilitySearch({ departments }: AvailabilitySearchPr
             </div>
           </div>
 
-          <Button type="submit" loading={loading} className="w-full mt-2">
+          <Button type="submit" loading={loading} className="w-full mt-2 cursor-pointer">
             <Search className="h-4 w-4" />
             Search Availability
           </Button>
@@ -179,32 +236,72 @@ export default function AvailabilitySearch({ departments }: AvailabilitySearchPr
       {/* Results Area */}
       <div className="lg:col-span-3">
         {results === null ? (
-          <div className="h-full min-h-[400px] flex items-center justify-center border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl bg-zinc-50/50 dark:bg-zinc-900/50">
+          <div className="h-full min-h-[400px] flex items-center justify-center border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl bg-zinc-50/50 dark:bg-zinc-900/50">
             <div className="text-center text-zinc-500">
-              <Search className="h-10 w-10 mx-auto mb-3 opacity-20" />
-              <p>Configure filters and search to find available resources.</p>
+              <Search className="h-10 w-10 mx-auto mb-3 opacity-20 text-zinc-400" />
+              <p className="font-medium text-sm">Configure filters and search to find available resources.</p>
+              <p className="text-xs text-zinc-400 mt-1">
+                Choose &ldquo;Find Slots&rdquo; for continuous openings or &ldquo;Daily Status&rdquo; for room breakdown.
+              </p>
             </div>
           </div>
         ) : results.length === 0 ? (
-          <div className="h-full min-h-[400px] flex items-center justify-center border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900 shadow-sm">
+          <div className="h-full min-h-[400px] flex items-center justify-center border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white dark:bg-zinc-900 shadow-sm p-8">
             <div className="text-center text-zinc-500">
-              <p className="text-lg font-medium text-zinc-900 dark:text-zinc-100">No resources found</p>
-              <p className="mt-1">Try relaxing your search criteria.</p>
+              <p className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">No resources found</p>
+              <p className="mt-1 text-sm text-zinc-500">
+                No rooms match the selected criteria for this date and time.
+              </p>
+              {statusFilter && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStatusFilter("");
+                    executeSearch({ status: "" });
+                  }}
+                  className="mt-3 text-xs text-blue-600 hover:underline cursor-pointer inline-flex items-center gap-1 font-medium"
+                >
+                  <X className="h-3 w-3" /> Clear status filter & search again
+                </button>
+              )}
             </div>
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium text-zinc-500">
-                Found {results.length} matching resource{results.length !== 1 ? 's' : ''}
-              </h3>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                  Found {results.length} matching resource{results.length !== 1 ? "s" : ""}
+                </h3>
+                {searchMode === "STATUS" && statusFilter && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800">
+                    <CheckCircle2 className="h-3 w-3" />
+                    {statusOptions.find((o) => o.value === statusFilter)?.label ?? statusFilter}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStatusFilter("");
+                        executeSearch({ status: "" });
+                      }}
+                      className="ml-1 hover:text-blue-900 cursor-pointer"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                )}
+              </div>
+              <span className="text-xs text-zinc-400">
+                Mode: {searchMode === "STATUS" ? "Daily Status" : "Continuous Slots"}
+              </span>
             </div>
 
             <div className="grid gap-4">
-              {results.map((r, i) => (
-                <div key={r.resourceId} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
+              {results.map((r) => (
+                <div
+                  key={r.resourceId}
+                  className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-xs hover:shadow-md transition-all duration-200"
+                >
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                    
                     {/* Resource Info */}
                     <div>
                       <div className="flex items-center gap-3 mb-1">
@@ -212,30 +309,36 @@ export default function AvailabilitySearch({ departments }: AvailabilitySearchPr
                         <StatusBadge status={r.status} />
                       </div>
                       <p className="text-sm text-zinc-500 mb-3">{r.resourceName}</p>
-                      
+
                       <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-600 dark:text-zinc-400">
                         <div className="flex items-center gap-1.5">
-                          <MapPin className="h-3.5 w-3.5" />
+                          <MapPin className="h-3.5 w-3.5 text-zinc-400" />
                           {BLOCK_LABELS[r.block]} • Floor {r.floor}
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <Users className="h-3.5 w-3.5" />
+                          <Users className="h-3.5 w-3.5 text-zinc-400" />
                           Capacity: {r.capacity}
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <Building className="h-3.5 w-3.5" />
+                          <Building className="h-3.5 w-3.5 text-zinc-400" />
                           {r.departmentCode || "Common"}
                         </div>
                       </div>
                     </div>
 
                     {/* Quick Stats */}
-                    <div className="flex flex-col gap-1.5 min-w-[140px] text-right bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-lg border border-zinc-100 dark:border-zinc-800">
+                    <div className="flex flex-col gap-1.5 min-w-[140px] text-right bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-xl border border-zinc-100 dark:border-zinc-800">
                       <div className="text-xs text-zinc-500">Utilization</div>
-                      <div className="font-semibold text-zinc-900 dark:text-zinc-100">{r.utilizationPercent}%</div>
-                      <div className="w-full bg-zinc-200 dark:bg-zinc-700 rounded-full h-1 mt-1">
+                      <div className="font-bold text-zinc-900 dark:text-zinc-100">{r.utilizationPercent}%</div>
+                      <div className="w-full bg-zinc-200 dark:bg-zinc-700 rounded-full h-1.5 mt-1">
                         <div
-                          className={`h-1 rounded-full ${r.utilizationPercent > 80 ? 'bg-red-500' : r.utilizationPercent > 40 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                          className={`h-1.5 rounded-full ${
+                            r.utilizationPercent > 80
+                              ? "bg-red-500"
+                              : r.utilizationPercent > 40
+                              ? "bg-amber-500"
+                              : "bg-emerald-500"
+                          }`}
                           style={{ width: `${Math.min(r.utilizationPercent, 100)}%` }}
                         />
                       </div>
@@ -243,31 +346,46 @@ export default function AvailabilitySearch({ departments }: AvailabilitySearchPr
                   </div>
 
                   {/* Matching Slots or Timeline */}
-                  <div className="mt-5 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+                  <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
                     {searchMode === "CONTINUOUS" && r.matchingSlots ? (
                       <div>
-                        <p className="text-xs font-medium text-zinc-500 mb-3 uppercase tracking-wider">Available Slots ({minDuration}+ mins)</p>
+                        <p className="text-xs font-semibold text-zinc-500 mb-2.5 uppercase tracking-wider">
+                          Available Slots ({minDuration}+ mins)
+                        </p>
                         <div className="flex flex-wrap gap-2">
                           {r.matchingSlots.map((slot: any, idx: number) => (
-                            <div key={idx} className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 text-emerald-800 dark:text-emerald-400 px-3 py-1.5 rounded-lg text-sm">
-                              <Clock className="h-4 w-4" />
-                              <span className="font-medium">{formatTime12h(slot.start)} - {formatTime12h(slot.end)}</span>
-                              <span className="text-xs opacity-75">({slot.durationMinutes}m)</span>
+                            <div
+                              key={idx}
+                              className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 text-emerald-800 dark:text-emerald-400 px-3 py-1.5 rounded-lg text-xs font-medium"
+                            >
+                              <Clock className="h-3.5 w-3.5" />
+                              <span>
+                                {formatTime12h(slot.start)} - {formatTime12h(slot.end)}
+                              </span>
+                              <span className="opacity-75">({slot.durationMinutes}m)</span>
                             </div>
                           ))}
                         </div>
                       </div>
                     ) : (
                       <div>
-                        <p className="text-xs font-medium text-zinc-500 mb-3 uppercase tracking-wider">Free Intervals Today</p>
+                        <p className="text-xs font-semibold text-zinc-500 mb-2.5 uppercase tracking-wider">
+                          Free Intervals Today
+                        </p>
                         <div className="flex flex-wrap gap-2">
-                          {r.freeIntervals.length === 0 ? (
-                            <span className="text-sm text-zinc-500">Fully booked</span>
+                          {r.freeIntervals && r.freeIntervals.length === 0 ? (
+                            <span className="text-xs text-zinc-500 italic">Fully booked for the day</span>
                           ) : (
-                            r.freeIntervals.map((slot: any, idx: number) => (
-                              <div key={idx} className="flex items-center gap-2 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 text-blue-800 dark:text-blue-400 px-3 py-1.5 rounded-lg text-sm">
-                                <Clock className="h-4 w-4" />
-                                <span>{formatTime12h(slot.start)} - {formatTime12h(slot.end)}</span>
+                            r.freeIntervals?.map((slot: any, idx: number) => (
+                              <div
+                                key={idx}
+                                className="flex items-center gap-2 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 text-blue-800 dark:text-blue-400 px-3 py-1.5 rounded-lg text-xs font-medium"
+                              >
+                                <Clock className="h-3.5 w-3.5" />
+                                <span>
+                                  {formatTime12h(slot.start)} - {formatTime12h(slot.end)}
+                                </span>
+                                <span className="opacity-75">({slot.durationMinutes}m)</span>
                               </div>
                             ))
                           )}
@@ -275,7 +393,6 @@ export default function AvailabilitySearch({ departments }: AvailabilitySearchPr
                       </div>
                     )}
                   </div>
-
                 </div>
               ))}
             </div>

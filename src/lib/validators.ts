@@ -182,7 +182,7 @@ export const availabilitySearchSchema = z.object({
   floor: z.number().int().min(1).max(8).optional(),
   departmentId: z.string().optional(),
   resourceType: z.enum(["CLASSROOM", "LAB", "SEMINAR_HALL", "AUDITORIUM", "CONFERENCE_ROOM", "OTHER"]).optional(),
-  status: z.enum(["FULLY_UNUSED", "PARTIALLY_USED", "FULLY_OCCUPIED"]).optional(),
+  status: z.enum(["FULLY_UNUSED", "PARTIALLY_USED", "FULLY_OCCUPIED", "AVAILABLE"]).optional(),
   minCapacity: z.number().int().min(1).optional(),
   minContinuousFreeMinutes: z.number().int().min(30).optional(),
 });
