@@ -31,7 +31,7 @@ model User {
 
   bookings  Booking[]
   auditLogs AuditLog[]
-  timetableImports TimetableImport[]
+  timetables Timetable[]
 
   @@map("users")
 }
@@ -55,6 +55,7 @@ model Department {
   resources Resource[]
   schedules Schedule[]
   bookings  Booking[]
+  timetables Timetable[]
 
   @@map("departments")
 }
@@ -138,6 +139,7 @@ model Resource {
   description  String?
   hasProjector Boolean      @default(false)
   hasSmartBoard Boolean     @default(false)
+  hasAC        Boolean      @default(false)
   computerCount Int         @default(0)
   isActive     Boolean      @default(true)
   createdAt    DateTime     @default(now())
@@ -166,33 +168,42 @@ enum DayOfWeek {
 }
 
 model Schedule {
-  id           String    @id @default(cuid())
-  dayOfWeek    DayOfWeek
-  startTime    String    // "HH:mm" format, e.g. "09:00"
-  endTime      String    // "HH:mm" format, e.g. "11:00"
-  resourceId   String
-  departmentId String?
-  programId    String?
-  year         Int?      // 1, 2, 3, 4
-  section      String?   // Only for 1st year: "A", "B"
-  subjectId    String?
-  facultyId    String?
-  timetableImportId String?
-  isActive     Boolean   @default(true)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id            String    @id @default(cuid())
+  dayOfWeek     DayOfWeek
+  startTime     String    // "HH:mm" format, e.g. "09:00"
+  endTime       String    // "HH:mm" format, e.g. "11:00"
+  resourceId    String
+  departmentId  String?
+  programId     String?
+  year          Int?      // 1, 2, 3, 4
+  section       String?   // Only for 1st year: "A", "B"
+  semesterLabel String?   // e.g. "1st MCA", "7th CSE"
+  classType     String?   // "LECTURE", "LAB", "TUTORIAL", "REMEDIAL", etc.
+  subjectId     String?
+  subjectCode   String?   // Preserved from timetable even if not resolved
+  subjectName   String?   // Preserved from timetable or resolved
+  facultyId     String?
+  facultyCode   String?   // Preserved from timetable (e.g. "SU", "MC")
+  sourceRow     Int?      // Originating row in sheet for traceability
+  sourceStartCol Int?     // Originating start column
+  sourceEndCol  Int?      // Originating end column
+  timetableId   String?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  resource        Resource         @relation(fields: [resourceId], references: [id])
-  department      Department?      @relation(fields: [departmentId], references: [id])
-  program         Program?         @relation(fields: [programId], references: [id])
-  subject         Subject?         @relation(fields: [subjectId], references: [id])
-  faculty         Faculty?         @relation(fields: [facultyId], references: [id])
-  timetableImport TimetableImport? @relation(fields: [timetableImportId], references: [id])
+  resource   Resource    @relation(fields: [resourceId], references: [id])
+  department Department? @relation(fields: [departmentId], references: [id])
+  program    Program?    @relation(fields: [programId], references: [id])
+  subject    Subject?    @relation(fields: [subjectId], references: [id])
+  faculty    Faculty?    @relation(fields: [facultyId], references: [id])
+  timetable  Timetable?  @relation(fields: [timetableId], references: [id], onDelete: Cascade)
 
   @@index([resourceId, dayOfWeek])
   @@index([facultyId, dayOfWeek])
   @@index([departmentId])
   @@index([dayOfWeek])
+  @@index([timetableId])
   @@map("schedules")
 }
 
@@ -251,31 +262,37 @@ model MaintenanceBlock {
 }
 
 // ==========================================
-// TIMETABLE IMPORTS
+// TIMETABLES (University Timetables)
 // ==========================================
 
-enum ImportStatus {
-  PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
+enum TimetableStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
 }
 
-model TimetableImport {
-  id              String       @id @default(cuid())
-  filename        String
-  status          ImportStatus @default(PENDING)
-  metadata        Json?
+model Timetable {
+  id              String          @id @default(cuid())
+  departmentId    String
+  name            String          // e.g. "CSE Routine Jul-Dec 2026"
+  academicPeriod  String          // e.g. "Jul-Dec 2026"
+  sourceFileName  String
+  timetableStatus TimetableStatus @default(DRAFT)
+  effectiveFrom   DateTime?
+  effectiveTo     DateTime?
+  metadata        Json?           // Parsing stats, unresolved counts, sheet info
+  recordsImported Int             @default(0)
+  recordsFailed   Int             @default(0)
   importedById    String
-  recordsImported Int          @default(0)
-  recordsFailed   Int          @default(0)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
+  department Department @relation(fields: [departmentId], references: [id])
   importedBy User       @relation(fields: [importedById], references: [id])
   schedules  Schedule[]
 
-  @@map("timetable_imports")
+  @@index([departmentId, timetableStatus])
+  @@map("timetables")
 }
 
 // ==========================================

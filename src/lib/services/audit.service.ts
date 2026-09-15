@@ -22,6 +22,7 @@ export type AuditEntityType =
   | "FACULTY"
   | "SUBJECT"
   | "USER"
+  | "TIMETABLE"
   | "TIMETABLE_IMPORT"
   | "MAINTENANCE_BLOCK";
 

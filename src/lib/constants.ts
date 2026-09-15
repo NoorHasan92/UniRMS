@@ -200,7 +200,7 @@ export const NAV_ITEMS: {
       { title: "Faculty", href: "/admin/faculty" },
       { title: "Subjects", href: "/admin/subjects" },
       { title: "Users", href: "/admin/users" },
-      { title: "Timetable Import", href: "/admin/timetable-import" },
+      { title: "Timetables", href: "/admin/timetables" },
       { title: "Audit Logs", href: "/admin/audit-logs" },
     ],
   },

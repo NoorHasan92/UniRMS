@@ -23,7 +23,7 @@ async function main() {
   await prisma.booking.deleteMany();
   await prisma.maintenanceBlock.deleteMany();
   await prisma.schedule.deleteMany();
-  await prisma.timetableImport.deleteMany();
+  await prisma.timetable.deleteMany();
   await prisma.subject.deleteMany();
   await prisma.faculty.deleteMany();
   await prisma.resource.deleteMany();
@@ -173,6 +173,8 @@ async function main() {
     { code: "RB-602", name: "MEN Lab 602", type: "LAB" as const, block: "RIGHT" as const, floor: 6, roomNumber: "602", departmentId: deptMap.MEN.id, capacity: 35, computerCount: 30 },
     { code: "RB-603", name: "CEN Classroom 603", type: "CLASSROOM" as const, block: "RIGHT" as const, floor: 6, roomNumber: "603", departmentId: deptMap.CEN.id, capacity: 45 },
     { code: "RB-604", name: "CEN Classroom 604", type: "CLASSROOM" as const, block: "RIGHT" as const, floor: 6, roomNumber: "604", departmentId: deptMap.CEN.id, capacity: 55 },
+    { code: "RB-606", name: "CSE Lab 606", type: "LAB" as const, block: "RIGHT" as const, floor: 6, roomNumber: "606", departmentId: deptMap.CSE.id, capacity: 40, hasProjector: true, computerCount: 35 },
+    { code: "RB-608", name: "CSE Classroom 608", type: "CLASSROOM" as const, block: "RIGHT" as const, floor: 6, roomNumber: "608", departmentId: deptMap.CSE.id, capacity: 55 },
 
     // Left Block - 5th Floor (Mixed)
     { code: "LB-501", name: "BIO Lab 501", type: "LAB" as const, block: "LEFT" as const, floor: 5, roomNumber: "501", departmentId: deptMap.BIO.id, capacity: 30, computerCount: 20 },
@@ -180,6 +182,8 @@ async function main() {
     { code: "LB-503", name: "CHEM Lab 503", type: "LAB" as const, block: "LEFT" as const, floor: 5, roomNumber: "503", departmentId: deptMap.CHEM.id, capacity: 30 },
     { code: "LB-504", name: "MBA Classroom 504", type: "CLASSROOM" as const, block: "LEFT" as const, floor: 5, roomNumber: "504", departmentId: deptMap.MBA.id, capacity: 40, hasProjector: true },
     { code: "LB-505", name: "ENG Classroom 505", type: "CLASSROOM" as const, block: "LEFT" as const, floor: 5, roomNumber: "505", departmentId: deptMap.ENG.id, capacity: 50 },
+    { code: "LB-506", name: "CSE Lab 506", type: "LAB" as const, block: "LEFT" as const, floor: 5, roomNumber: "506", departmentId: deptMap.CSE.id, capacity: 35, computerCount: 30 },
+    { code: "LB-507", name: "CSE Lab 507", type: "LAB" as const, block: "LEFT" as const, floor: 5, roomNumber: "507", departmentId: deptMap.CSE.id, capacity: 35, computerCount: 30 },
   ];
 
   const resources = await Promise.all(
