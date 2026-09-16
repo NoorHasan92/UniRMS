@@ -7,6 +7,7 @@ export interface ResolvableResource {
   roomNumber: string;
   name: string;
   type: string;
+  block?: string | null;
   departmentId?: string | null;
 }
 
@@ -114,38 +115,125 @@ export function normalizeRoomCode(code: string): string {
 
 /**
  * Matches a normalized room code to a database Resource record.
+ * Handles Left/Right/Central blocks:
+ * - If Left (LB) or Right (RB) is explicitly mentioned, routes to that block.
+ * - If Left/Right is NOT mentioned (only a number is present, or it is a lab session),
+ *   it refers to the CENTRAL block.
  */
 export function matchResource(
   rawRoomCode: string,
-  resources: ResolvableResource[]
+  resources: ResolvableResource[],
+  options?: { isLab?: boolean; classType?: string }
 ): ResolvableResource | null {
   if (!rawRoomCode) return null;
   const norm = normalizeRoomCode(rawRoomCode);
   if (!norm) return null;
 
-  // 1. Direct code match (e.g. "RB705" matches resource "RB-705")
+  const upperRaw = rawRoomCode.trim().toUpperCase();
+  const hasExplicitRight = upperRaw.startsWith("RB") || upperRaw.includes("RIGHT");
+  const hasExplicitLeft = upperRaw.startsWith("LB") || upperRaw.includes("LEFT");
+  const hasExplicitCentral = upperRaw.startsWith("CB") || upperRaw.includes("CENTRAL");
+  const noBlockMentioned = !hasExplicitRight && !hasExplicitLeft && !hasExplicitCentral;
+  const isLab = Boolean(options?.isLab || options?.classType === "LAB" || upperRaw.includes("LAB"));
+
+  // 1. Direct code match (e.g. "RB705" matches resource "RB-705", "CB708" matches "CB-708")
   for (const r of resources) {
     const rNorm = normalizeRoomCode(r.code);
     if (rNorm === norm) return r;
   }
 
-  // 2. Room number match (e.g. "608" matches roomNumber "608")
-  for (const r of resources) {
-    const rNum = normalizeRoomCode(r.roomNumber);
-    if (rNum === norm) return r;
+  // 2. If Left/Right/Central is explicitly mentioned:
+  if (hasExplicitRight) {
+    const stripped = norm.replace(/^RB/i, "");
+    for (const r of resources) {
+      if (
+        (r.block === "RIGHT" || r.code.toUpperCase().startsWith("RB")) &&
+        (normalizeRoomCode(r.roomNumber) === stripped || normalizeRoomCode(r.code).endsWith(stripped))
+      ) {
+        return r;
+      }
+    }
   }
 
-  // 3. Block prefix stripped match:
-  // If norm has block prefix ("RB608"), check if r.roomNumber is "608"
-  const strippedNorm = norm.replace(/^(RB|LB)/i, "");
+  if (hasExplicitLeft) {
+    const stripped = norm.replace(/^LB/i, "");
+    for (const r of resources) {
+      if (
+        (r.block === "LEFT" || r.code.toUpperCase().startsWith("LB")) &&
+        (normalizeRoomCode(r.roomNumber) === stripped || normalizeRoomCode(r.code).endsWith(stripped))
+      ) {
+        return r;
+      }
+    }
+  }
+
+  if (hasExplicitCentral) {
+    const stripped = norm.replace(/^(CB|CENTRAL|LAB)/i, "");
+    for (const r of resources) {
+      if (
+        (r.block === "CENTRAL" || r.code.toUpperCase().startsWith("CB") || r.code.toUpperCase().startsWith("LAB")) &&
+        (normalizeRoomCode(r.roomNumber) === stripped || normalizeRoomCode(r.code).endsWith(stripped))
+      ) {
+        return r;
+      }
+    }
+  }
+
+  // 3. If Left/Right/Central is NOT explicitly mentioned in the room code:
+  // User Rule: "if only room number is mentioned in cell and its a lab, then its central,
+  // if block is mentioned along with room number and its a lab, then only lab will be RB or LB,
+  // if no block is mentioned and its lab type class, then its CB, central block"
+  if (noBlockMentioned) {
+    // 3a. Search for a matching resource in CENTRAL block
+    const centralCandidates = resources.filter((r) => {
+      const isCentral =
+        r.block === "CENTRAL" ||
+        r.code.toUpperCase().startsWith("CB") ||
+        r.code.toUpperCase().startsWith("LAB");
+      const rNum = normalizeRoomCode(r.roomNumber);
+      const rCode = normalizeRoomCode(r.code);
+      return isCentral && (rNum === norm || rCode.endsWith(norm));
+    });
+
+    if (centralCandidates.length > 0) {
+      if (isLab) {
+        const labCandidate = centralCandidates.find((r) => r.type === "LAB");
+        if (labCandidate) return labCandidate;
+      }
+      return centralCandidates[0];
+    }
+
+    // 3b. If it is a lab and no block was mentioned, it MUST be Central Block.
+    // Do NOT fall back to RB or LB resources!
+    if (isLab) {
+      return null;
+    }
+  }
+
+  // 4. Fallback room number match (for classrooms when no block mentioned)
+  for (const r of resources) {
+    const rNum = normalizeRoomCode(r.roomNumber);
+    if (rNum === norm) {
+      // Never allow an un-prefixed lab to fall back to an RB or LB room
+      if (isLab && noBlockMentioned && (r.block === "RIGHT" || r.block === "LEFT" || r.code.toUpperCase().startsWith("RB") || r.code.toUpperCase().startsWith("LB"))) {
+        continue;
+      }
+      return r;
+    }
+  }
+
+  // 5. Block prefix stripped match:
+  const strippedNorm = norm.replace(/^(RB|LB|CB|LAB)/i, "");
   if (strippedNorm && strippedNorm !== norm) {
     for (const r of resources) {
+      if (isLab && noBlockMentioned && (r.block === "RIGHT" || r.block === "LEFT")) continue;
       if (normalizeRoomCode(r.roomNumber) === strippedNorm) return r;
     }
   }
 
-  // If norm doesn't have block prefix ("608"), check if r.code ends with norm
+  // 6. Suffix match
   for (const r of resources) {
+    if (isLab && noBlockMentioned && (r.block === "RIGHT" || r.block === "LEFT")) continue;
     const rNorm = normalizeRoomCode(r.code);
     if (rNorm.endsWith(norm)) return r;
   }
@@ -262,8 +350,16 @@ export function resolveTimetableEntries(
       continue;
     }
 
-    // Match resource
-    const matchedResource = matchResource(rawRoom, resources);
+    // Match resource with lab/block contextual routing
+    const isLab =
+      entry.classType === "LAB" ||
+      Boolean(entry.altRoomCode) ||
+      /lab/i.test(entry.rawContent);
+
+    const matchedResource = matchResource(rawRoom, resources, {
+      isLab,
+      classType: entry.classType,
+    });
     if (!matchedResource) {
       unresolvedRoomsSet.add(rawRoom);
       unresolvedEntries.push({

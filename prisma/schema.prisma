@@ -124,6 +124,7 @@ enum ResourceType {
 enum Block {
   LEFT
   RIGHT
+  CENTRAL
 }
 
 model Resource {

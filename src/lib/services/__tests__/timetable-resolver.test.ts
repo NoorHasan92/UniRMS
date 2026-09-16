@@ -43,22 +43,30 @@ function runTests() {
   // ----------------------------------------------------
   console.log("▶ Testing matchResource...");
   const mockResources: ResolvableResource[] = [
-    { id: "res-705", code: "RB-705", roomNumber: "705", name: "CSE Lab 705", type: "LAB" },
-    { id: "res-702", code: "RB-702", roomNumber: "702", name: "CSE Classroom 702", type: "CLASSROOM" },
-    { id: "res-608", code: "RB-608", roomNumber: "608", name: "CSE Classroom 608", type: "CLASSROOM" },
-    { id: "res-606", code: "RB-606", roomNumber: "606", name: "CSE Lab 606", type: "LAB" },
+    { id: "res-705", code: "RB-705", roomNumber: "705", name: "CSE Lab 705", type: "LAB", block: "RIGHT" },
+    { id: "res-702", code: "RB-702", roomNumber: "702", name: "CSE Classroom 702", type: "CLASSROOM", block: "RIGHT" },
+    { id: "res-608", code: "RB-608", roomNumber: "608", name: "CSE Classroom 608", type: "CLASSROOM", block: "RIGHT" },
+    { id: "res-606", code: "RB-606", roomNumber: "606", name: "CSE Lab 606", type: "LAB", block: "RIGHT" },
+    { id: "res-cb-606", code: "CB-606", roomNumber: "606", name: "CSE Lab 606", type: "LAB", block: "CENTRAL" },
+    { id: "res-cb-708", code: "CB-708", roomNumber: "708", name: "CSE Lab 708", type: "LAB", block: "CENTRAL" },
+    { id: "res-cb-608", code: "CB-608", roomNumber: "608", name: "CSE Lab 608", type: "LAB", block: "CENTRAL" },
   ];
 
   const m1 = matchResource("RB705", mockResources);
   assertEqual(m1?.id, "res-705", "matches RB705 to res-705");
   passed++;
 
-  const m2 = matchResource("608", mockResources);
-  assertEqual(m2?.id, "res-608", "matches 608 to res-608");
+  const m2 = matchResource("RB-608", mockResources);
+  assertEqual(m2?.id, "res-608", "matches RB-608 to res-608");
   passed++;
 
+  // Un-prefixed lab must match CENTRAL block lab:
   const m3 = matchResource("Lab -606", mockResources);
-  assertEqual(m3?.id, "res-606", "matches Lab -606 to res-606");
+  assertEqual(m3?.id, "res-cb-606", "matches un-prefixed Lab -606 to Central Block res-cb-606");
+  passed++;
+
+  const m3b = matchResource("708", mockResources, { isLab: true });
+  assertEqual(m3b?.id, "res-cb-708", "matches un-prefixed 708 lab to Central Block res-cb-708");
   passed++;
 
   const m4 = matchResource("NONEXISTENT", mockResources);
@@ -112,10 +120,15 @@ function runTests() {
     { id: "10", code: "RB-602", roomNumber: "602", name: "MEN Lab 602", type: "LAB" },
     { id: "11", code: "RB-603", roomNumber: "603", name: "CEN Classroom 603", type: "CLASSROOM" },
     { id: "12", code: "RB-604", roomNumber: "604", name: "CEN Classroom 604", type: "CLASSROOM" },
-    { id: "13", code: "RB-606", roomNumber: "606", name: "CSE Lab 606", type: "LAB" },
-    { id: "14", code: "RB-608", roomNumber: "608", name: "CSE Classroom 608", type: "CLASSROOM" },
-    { id: "15", code: "LB-506", roomNumber: "506", name: "CSE Lab 506", type: "LAB" },
-    { id: "16", code: "LB-507", roomNumber: "507", name: "CSE Lab 507", type: "LAB" },
+    { id: "13", code: "RB-606", roomNumber: "606", name: "CSE Lab 606", type: "LAB", block: "RIGHT" },
+    { id: "14", code: "RB-608", roomNumber: "608", name: "CSE Classroom 608", type: "CLASSROOM", block: "RIGHT" },
+    { id: "15", code: "LB-506", roomNumber: "506", name: "CSE Lab 506", type: "LAB", block: "LEFT" },
+    { id: "16", code: "LB-507", roomNumber: "507", name: "CSE Lab 507", type: "LAB", block: "LEFT" },
+    { id: "17", code: "CB-708", roomNumber: "708", name: "CSE Lab 708", type: "LAB", block: "CENTRAL" },
+    { id: "18", code: "CB-608", roomNumber: "608", name: "CSE Lab 608", type: "LAB", block: "CENTRAL" },
+    { id: "19", code: "CB-606", roomNumber: "606", name: "CSE Lab 606", type: "LAB", block: "CENTRAL" },
+    { id: "20", code: "CB-506", roomNumber: "506", name: "CSE Lab 506", type: "LAB", block: "CENTRAL" },
+    { id: "21", code: "CB-507", roomNumber: "507", name: "CSE Lab 507", type: "LAB", block: "CENTRAL" },
   ];
 
   const fixtureBuffer = readFileSync(join(process.cwd(), "CSE_Routine_Jul-Dec_2026.xlsx"));

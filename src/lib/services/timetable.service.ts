@@ -96,7 +96,7 @@ export async function previewTimetableFromBuffer(
   const [resources, faculty, subjects, programs, existingSchedules] = await Promise.all([
     prisma.resource.findMany({
       where: { isActive: true },
-      select: { id: true, code: true, roomNumber: true, name: true, type: true, departmentId: true },
+      select: { id: true, code: true, roomNumber: true, name: true, type: true, block: true, departmentId: true },
     }),
     prisma.faculty.findMany({
       where: { isActive: true },
@@ -124,6 +124,49 @@ export async function previewTimetableFromBuffer(
       },
     }),
   ]);
+
+  // 2b. Ensure any un-prefixed lab rooms are registered as Central Block labs in UniRMS
+  const existingCentralRooms = new Set(
+    resources
+      .filter((r) => r.block === "CENTRAL" || r.code.toUpperCase().startsWith("CB"))
+      .map((r) => r.roomNumber.replace(/[-\s.]/g, ""))
+  );
+
+  for (const entry of parsed.entries) {
+    const isLab = entry.classType === "LAB" || Boolean(entry.altRoomCode);
+    if (!isLab) continue;
+    const room = entry.altRoomCode || entry.roomCode;
+    if (!room) continue;
+
+    const upper = room.trim().toUpperCase();
+    const hasExplicitBlock = upper.startsWith("RB") || upper.startsWith("LB") || upper.startsWith("CB");
+    if (!hasExplicitBlock) {
+      const cleanNum = room.replace(/[^0-9]/g, "");
+      if (cleanNum && !existingCentralRooms.has(cleanNum)) {
+        const code = `CB-${cleanNum}`;
+        const floor = Math.floor(parseInt(cleanNum, 10) / 100) || 1;
+        const created = await prisma.resource.upsert({
+          where: { code },
+          update: {},
+          create: {
+            code,
+            name: `${department.code} Lab ${cleanNum}`,
+            type: "LAB",
+            block: "CENTRAL",
+            floor,
+            roomNumber: cleanNum,
+            capacity: 40,
+            computerCount: 35,
+            departmentId: department.id,
+            isActive: true,
+          },
+          select: { id: true, code: true, roomNumber: true, name: true, type: true, block: true, departmentId: true },
+        });
+        resources.push(created);
+        existingCentralRooms.add(cleanNum);
+      }
+    }
+  }
 
   // 3. Resolve entities and detect conflicts
   const resolutionSummary = resolveTimetableEntries(parsed.entries, {

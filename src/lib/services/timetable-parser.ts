@@ -342,13 +342,12 @@ export function parseCellContent(rawInput: string): ParsedCellContent {
   let classType: "LECTURE" | "LAB" | "TUTORIAL" | "REMEDIAL" | "PROJECT" | "OTHER" = "LECTURE";
   let altRoom: string | undefined = undefined;
 
-  // 1. Extract alt room (e.g. "(608)", "(708)", "(Lab -606)", "(506)", "(507)")
-  const roomMatch = text.match(/\((?:Lab\s*[-–]?\s*)?([0-9]{3}[A-Z]?)\)/i);
+  // 1. Extract alt room (e.g. "(608)", "(708)", "(Lab -606)", "(RB-708)", "(LB-501)", "(CB-708)")
+  const roomMatch = text.match(/\((?:(?:Lab\s*[-–]?\s*)|(?:(RB|LB|CB)\s*[-–]?\s*))?([0-9]{3}[A-Z]?)\)/i);
   if (roomMatch) {
-    altRoom = roomMatch[1].trim();
-    if (/lab/i.test(roomMatch[0])) {
-      classType = "LAB";
-    }
+    const blockPrefix = roomMatch[1] ? `${roomMatch[1].toUpperCase()}-` : "";
+    altRoom = (blockPrefix + roomMatch[2]).trim();
+    classType = "LAB";
     text = text.replace(roomMatch[0], "").trim();
   }
 

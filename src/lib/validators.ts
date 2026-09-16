@@ -75,7 +75,7 @@ export const resourceSchema = z.object({
   code: z.string().min(1, "Code is required").max(20),
   name: z.string().min(1, "Name is required").max(100),
   type: z.enum(["CLASSROOM", "LAB", "SEMINAR_HALL", "AUDITORIUM", "CONFERENCE_ROOM", "OTHER"]),
-  block: z.enum(["LEFT", "RIGHT"]),
+  block: z.enum(["LEFT", "RIGHT", "CENTRAL"]),
   floor: z.number().int().min(1).max(8),
   roomNumber: z.string().min(1, "Room number is required"),
   departmentId: z.string().optional().nullable(),

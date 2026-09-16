@@ -155,6 +155,7 @@ export default function ResourceList({ initialResources, departments, isAdmin }:
   const blockOptions = [
     { value: "LEFT", label: "Left Block" },
     { value: "RIGHT", label: "Right Block" },
+    { value: "CENTRAL", label: "Central Block" },
   ];
 
   return (

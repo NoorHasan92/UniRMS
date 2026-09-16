@@ -14,12 +14,14 @@ export const WORKING_HOURS = {
 export const BLOCK_LABELS: Record<string, string> = {
   LEFT: "Left Block",
   RIGHT: "Right Block",
+  CENTRAL: "Central Block",
 } as const;
 
 /** Block code prefixes */
 export const BLOCK_CODES: Record<string, string> = {
   LEFT: "LB",
   RIGHT: "RB",
+  CENTRAL: "CB",
 } as const;
 
 /** Year labels */

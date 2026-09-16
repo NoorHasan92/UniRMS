@@ -573,11 +573,15 @@ export default function TimetableImportWizard({
                           <span className="font-bold text-zinc-900 dark:text-zinc-100">
                             {item.resourceCode || item.entry.roomCode}
                           </span>
-                          {item.entry.altRoomCode && (
-                            <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                          {item.resourceCode?.startsWith("CB-") ? (
+                            <span className="ml-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300">
+                              Central Lab
+                            </span>
+                          ) : item.entry.altRoomCode && !item.resourceCode?.endsWith(item.entry.altRoomCode) ? (
+                            <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
                               alt: {item.entry.altRoomCode}
                             </span>
-                          )}
+                          ) : null}
                         </td>
                         <td className="py-2 px-3 font-medium text-zinc-800 dark:text-zinc-200">
                           {item.entry.subjectCode}

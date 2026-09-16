@@ -181,9 +181,12 @@ async function main() {
     { code: "LB-502", name: "PHY Lab 502", type: "LAB" as const, block: "LEFT" as const, floor: 5, roomNumber: "502", departmentId: deptMap.PHY.id, capacity: 35 },
     { code: "LB-503", name: "CHEM Lab 503", type: "LAB" as const, block: "LEFT" as const, floor: 5, roomNumber: "503", departmentId: deptMap.CHEM.id, capacity: 30 },
     { code: "LB-504", name: "MBA Classroom 504", type: "CLASSROOM" as const, block: "LEFT" as const, floor: 5, roomNumber: "504", departmentId: deptMap.MBA.id, capacity: 40, hasProjector: true },
-    { code: "LB-505", name: "ENG Classroom 505", type: "CLASSROOM" as const, block: "LEFT" as const, floor: 5, roomNumber: "505", departmentId: deptMap.ENG.id, capacity: 50 },
-    { code: "LB-506", name: "CSE Lab 506", type: "LAB" as const, block: "LEFT" as const, floor: 5, roomNumber: "506", departmentId: deptMap.CSE.id, capacity: 35, computerCount: 30 },
-    { code: "LB-507", name: "CSE Lab 507", type: "LAB" as const, block: "LEFT" as const, floor: 5, roomNumber: "507", departmentId: deptMap.CSE.id, capacity: 35, computerCount: 30 },
+    // Central Block - Labs (All labs where block is not explicitly specified)
+    { code: "CB-708", name: "CSE Lab 708", type: "LAB" as const, block: "CENTRAL" as const, floor: 7, roomNumber: "708", departmentId: deptMap.CSE.id, capacity: 40, hasProjector: true, computerCount: 40 },
+    { code: "CB-608", name: "CSE Lab 608", type: "LAB" as const, block: "CENTRAL" as const, floor: 6, roomNumber: "608", departmentId: deptMap.CSE.id, capacity: 40, hasProjector: true, computerCount: 40 },
+    { code: "CB-606", name: "CSE Lab 606", type: "LAB" as const, block: "CENTRAL" as const, floor: 6, roomNumber: "606", departmentId: deptMap.CSE.id, capacity: 40, hasProjector: true, computerCount: 35 },
+    { code: "CB-506", name: "CSE Lab 506", type: "LAB" as const, block: "CENTRAL" as const, floor: 5, roomNumber: "506", departmentId: deptMap.CSE.id, capacity: 35, computerCount: 30 },
+    { code: "CB-507", name: "CSE Lab 507", type: "LAB" as const, block: "CENTRAL" as const, floor: 5, roomNumber: "507", departmentId: deptMap.CSE.id, capacity: 35, computerCount: 30 },
   ];
 
   const resources = await Promise.all(
