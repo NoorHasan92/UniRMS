@@ -488,10 +488,16 @@ export default function TimetableImportWizard({
             <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 space-y-2">
               <div className="flex items-center gap-2 text-sm font-bold text-amber-800 dark:text-amber-300">
                 <AlertTriangle className="h-4 w-4 text-amber-600" />
-                Room Overlaps Detected ({previewData.resolutionSummary.conflicts.length})
+                {previewData.resolutionSummary.internalConflictCount > 0 && previewData.resolutionSummary.existingConflictCount > 0
+                  ? `Room Overlaps & Clashes Detected (${previewData.resolutionSummary.conflicts.length})`
+                  : previewData.resolutionSummary.internalConflictCount > 0
+                  ? `Spreadsheet Room Overlaps Detected (${previewData.resolutionSummary.internalConflictCount})`
+                  : `Clashes with Active Schedules (${previewData.resolutionSummary.existingConflictCount})`}
               </div>
               <p className="text-xs text-amber-700 dark:text-amber-400">
-                Some classes overlap in the same room (e.g. parallel batch laboratory sessions). These are preserved as parsed and listed below:
+                {previewData.resolutionSummary.internalConflictCount > 0
+                  ? "Some classes overlap in the same room (e.g. parallel batch laboratory sessions). These are preserved as parsed and listed below:"
+                  : "Some classes overlap with existing active schedules in other departments. Review them below:"}
               </p>
               <div className="max-h-36 overflow-y-auto text-xs space-y-1 text-amber-900 dark:text-amber-300 bg-amber-100/50 dark:bg-amber-900/30 p-2.5 rounded-xl">
                 {previewData.resolutionSummary.conflicts.slice(0, 10).map((c, i) => (

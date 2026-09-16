@@ -36,6 +36,7 @@ export default function ResourceList({ initialResources, departments, isAdmin }:
   const [departmentId, setDepartmentId] = useState<string>("");
   const [capacity, setCapacity] = useState<number>(40);
   const [description, setDescription] = useState("");
+  const [hasAC, setHasAC] = useState(false);
   const [hasProjector, setHasProjector] = useState(false);
   const [hasSmartBoard, setHasSmartBoard] = useState(false);
   const [computerCount, setComputerCount] = useState<number>(0);
@@ -51,6 +52,7 @@ export default function ResourceList({ initialResources, departments, isAdmin }:
     setDepartmentId("");
     setCapacity(40);
     setDescription("");
+    setHasAC(false);
     setHasProjector(false);
     setHasSmartBoard(false);
     setComputerCount(0);
@@ -69,6 +71,7 @@ export default function ResourceList({ initialResources, departments, isAdmin }:
     setDepartmentId(res.departmentId || "");
     setCapacity(res.capacity);
     setDescription(res.description || "");
+    setHasAC(res.hasAC);
     setHasProjector(res.hasProjector);
     setHasSmartBoard(res.hasSmartBoard);
     setComputerCount(res.computerCount);
@@ -92,6 +95,7 @@ export default function ResourceList({ initialResources, departments, isAdmin }:
         departmentId: departmentId || undefined,
         capacity,
         description: description.trim() || undefined,
+        hasAC,
         hasProjector,
         hasSmartBoard,
         computerCount,
@@ -130,7 +134,7 @@ export default function ResourceList({ initialResources, departments, isAdmin }:
 
   async function handleDelete(id: string) {
     if (!confirm("Are you sure you want to delete this resource?")) return;
-    
+
     try {
       const res = await deleteResource(id);
       if (res.success) {
@@ -257,7 +261,7 @@ export default function ResourceList({ initialResources, departments, isAdmin }:
       >
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
           {error && <div className="text-sm text-red-500 bg-red-50 p-3 rounded-md">{error}</div>}
-          
+
           <div className="grid grid-cols-2 gap-4">
             <Input
               label="Resource Code"
@@ -349,6 +353,16 @@ export default function ResourceList({ initialResources, departments, isAdmin }:
           </div>
 
           <div className="flex gap-6 pt-2">
+            <label className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+              <input
+                type="checkbox"
+                checked={hasAC}
+                onChange={(e) => setHasAC(e.target.checked)}
+                className="rounded border-zinc-300 text-blue-600 focus:ring-blue-500"
+                disabled={loading}
+              />
+              Has AC
+            </label>
             <label className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
               <input
                 type="checkbox"

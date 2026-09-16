@@ -111,7 +111,13 @@ export async function previewTimetableFromBuffer(
       select: { id: true, code: true, name: true, departmentId: true },
     }),
     prisma.schedule.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        // Only check against real active timetables of OTHER departments.
+        // Existing schedules of the same department will be archived/superseded upon publishing.
+        departmentId: { not: departmentId },
+        timetableId: { not: null },
+      },
       select: {
         id: true,
         resourceId: true,
@@ -238,6 +244,12 @@ export async function commitTimetable(input: CommitTimetableInput) {
           data: { isActive: false },
         });
       }
+
+      // Also deactivate any prior active schedules for this department (including any initial seed/orphan entries)
+      await tx.schedule.updateMany({
+        where: { departmentId, isActive: true },
+        data: { isActive: false },
+      });
     }
 
     // Create Timetable record
